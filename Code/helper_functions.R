@@ -1,10 +1,3 @@
-genObs <- function (covariates.matrix, beta, error.term) {
-  # gen.obs takes a covariate matrix n by m, 
-  # a beta vector (including intercept) 1 by m and a error term
-  # and returns a vector 1 by n of observations y = XB + e  
-  obs <- covariates.matrix %*% beta + error.term
-  return (obs)
-}
 ###############################################################################
 # TOMORROW I WILL TRY TO OPTIMIZE MY CODE, FOR INSTANCE, I CAN FACTOR OUT
 # A LOT OF STUFF, BUT FOR NOW THIS SHOUDL WORK OR AT LEAST I HOPE SO!!
@@ -46,16 +39,16 @@ genMCAR <- function(df, vec.prob, vec.col) {
 }
 
 ###############################################################################
-genMAR <- function(df, prop, vec.col){
+genMAR <- function(df, prop, beta.missing, vec.col){
   # genMAR takes a dataframe (n by m), a vector (1 by m) of proportions and
   # a vector (1 by m) indicating in which columns we should induce MAR.
   # it returns a dataframe containing missing values. For each column selected
   # on average we will have the respective proportion of missing values.
+  # Assume first column of dataframe is response
   
   lCol <- length(vec.col)
   
   # We might consider changing this or factoring it out
-  betas <- 5 + 5*runif(lCol)
   vec.prob <- matrix(NA, ncol = lCol, nrow = nrow(df))
   vec.beta0 <- rep(NA, lCol)
   
@@ -63,7 +56,7 @@ genMAR <- function(df, prop, vec.col){
     
     f <- function (beta0) { 
       prop[i] - mean(1/(1 + exp(-beta0 - 
-                                  as.matrix(df[,vec.col[-i]])%*%betas[-i])))
+                                  as.matrix(df[,vec.col[-i]])%*%beta.missing[-i])))
     }
     
     vec.beta0[i] <- uniroot(f, interval = c(-100000,100000))$root
@@ -73,7 +66,7 @@ genMAR <- function(df, prop, vec.col){
     # The way we computed beta0 makes sure that the expected prop. of 
     # missing values in column i is as desired.
     vec.prob[,i] <- 1/(1 + exp(-vec.beta0[i] - 
-                           as.matrix(df[,vec.col[-i]])%*%betas[-i]))   
+                           as.matrix(df[,vec.col[-i]])%*%beta.missing[-i]))   
   }
   
   missing.matrix <- matrix(rbinom(n = nrow(df)*lCol, 1, c(vec.prob)), 
@@ -96,11 +89,9 @@ genMAR <- function(df, prop, vec.col){
 # missing data is MAR)
 ##############################################################################
 
-genMNAR <- function(df, prop, vec.col) {
+genMNAR <- function(df, prop, beta.missing, vec.col) {
   
   lCol <- length(vec.col)
-  # we may consider change this or factor it out
-  betas <- 5 + 5*runif(lCol)
   vec.prob <- matrix(NA, ncol = lCol, nrow = nrow(df))
   vec.beta0 <- rep(NA, lCol)
   
@@ -108,13 +99,13 @@ genMNAR <- function(df, prop, vec.col) {
     
     f <- function (beta0) { 
       prop[i] - mean(1/(1 + exp(-beta0 - 
-                                  as.matrix(df[,vec.col])%*%betas)))
+                                  as.matrix(df[,vec.col])%*%beta.missing)))
     }
     
     # I hope that the interval makes the function converge
     vec.beta0[i] <- uniroot(f, interval = c(-100000,100000))$root
     vec.prob[,i] <- 1/(1 + exp(-vec.beta0[i] - 
-                                 as.matrix(df[,vec.col])%*%betas))   
+                                 as.matrix(df[,vec.col])%*%beta.missing))   
   }
   
   # I should factor out the rest of the code

@@ -1,24 +1,38 @@
 ###################
 # Data Generation #
 ###################
-n = 1000
-p = .25
+source("./helper_functions.R")
 
-edu <- rbinom(n, 1, p)
+#Maybe we can create a helper functions to generate obs?
+
+# n = sample size, p = probability of having at least grad level education
+n <- 1000
+p.grad <- .25
+
+edu <- rbinom(n, 1, p.grad)
 epsilon <- rnorm(n, 0, 1)
 age <- rep(NA, n)
 
+# We use the faact that the number of units with edu == 1 is sum(edu)
+# because edu is binary. Also, we draw from a truncated normal 
+# with range (0,105). Is this an issue?
+library(truncnorm)
+age[which(edu == 0)] <- rtruncnorm(n - sum(edu), a = 10, b = 105, 
+                                   mean = 50, sd = 30)
+age[which(edu == 1)] <- rtruncnorm(sum(edu), a = 10, b = 105, 
+                                   mean = 45, sd = 20)
+
 # Loop through education and simulate from different normals for different
 # education levels of the population to create dependency 
-for (i in 1:n) {
-  if (edu[i] == 0) {
-    age[i] <- rnorm(1, 50, 30)
-    
-  }
-  else {
-    age[i] <- rnorm(1, 45, 20)    
-  }
-}
+
+# for (i in 1:n) {
+#   if (edu[i] == 0) {
+#     age[i] <- rnorm(1, 50, 30)
+#   }
+#   else {
+#     age[i] <- rnorm(1, 45, 20)    
+#   }
+# }
 
 # set the true values of the beta parameters
 beta <- c(10, .7, .8)
@@ -27,11 +41,30 @@ beta <- c(10, .7, .8)
 logincome <- beta[1] + beta[2]*age + beta[3]*edu + epsilon
 
 # bind all the covariates and income data into a dataframe
-data <- data.frame(age, edu, epsilon, y)
+data <- data.frame(logincome, age, edu) # here I changed it 
+colnames(data) <- c("Logincome", "Age", "Edu")
 
 ########################
 # Generate Missingness #
 ########################
+# generate missingness on all columns (otherwise specify vector) 
+col.missing <- c(1:ncol(data))
+
+# note that for MAR and MCAR this is a vector of proportions
+prob <- c(.6, .3, .8)
+# coefficients used to generate missingness
+coeff.miss <- c(5, 19, 10)
+
+# Generate MCAR
+data.MCAR <- genMCAR(df = data, vec.prob = prob, vec.col = col.missing)
+
+# Generate MAR
+data.MAR <- genMAR(df = data, prop = prob, beta.missing = coeff.miss, 
+                   vec.col = col.missing)
+
+# Generate MNAR
+data.MNAR <- genMNAR(df = data, prop = prob, beta.missing = coeff.miss, 
+                     vec.col = col.missing)
 
 ######################
 # Imputation Methods #
@@ -40,11 +73,21 @@ data <- data.frame(age, edu, epsilon, y)
 # METHOD 1: Complete Case analysis
 # Here, we want to remove the rows that have some missing values 
 # using dataframe subsetting
-complete_data <- data[complete.cases(data), ]
+complete_data_MCAR <- data.MCAR[complete.cases(data.MCAR), ]
+complete_data_MAR <- data.MAR[complete.cases(data.MAR), ]
+complete_data_MNAR <- data.MNAR[complete.cases(data.MNAR),]
 
 
 # METHOD 2: Single Imputation
+vec_mean.MCAR <- rep(NA, ncol(data.MCAR))
+vec.mean.MAR <- rep(NA, ncol(data.MAR))
+vec.mean.MNAR <- rep(NA, ncol(data.MNAR))
 
+for (i in 1:ncol(data)) {
+  vec.mean.MCAR[i] <- mean(data.MCAR)
+  vec.mean.MAR[i] <- mean(data.MAR)
+  vec.mean.MNAR[i] <- mean(data.MNAR)
+}
 # METHOD 3: Multiple Imputation
 library("mice")
 library("mi")
