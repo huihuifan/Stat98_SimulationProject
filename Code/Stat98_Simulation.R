@@ -1,85 +1,35 @@
-###################
-# Data Generation #
-###################
+####################
+# Import libraries #
+####################
 
-# setwd("/Users/AngelaFan/Desktop/Stat98_SimulationProject/Code")
-source("helper_functions.R")
-set.seed(02138)
-
-#Maybe we can create a helper functions to generate obs?
-
-# n = sample size, p.grad = probability of having at least grad level education
-n <- 1000
-p.grad <- .25
-
-edu <- rbinom(n, 1, p.grad)
-epsilon <- rnorm(n, 0, 1)
-age <- rep(NA, n)
-
-# We use the faact that the number of units with edu == 1 is sum(edu)
-# because edu is binary. Also, we draw from a truncated normal 
-# with range (0,105). 
 library(truncnorm)
-age[which(edu == 0)] <- rtruncnorm(n - sum(edu), a = 10, b = 105, 
-                                   mean = 50, sd = 30)
-age[which(edu == 1)] <- rtruncnorm(sum(edu), a = 10, b = 105, 
-                                   mean = 45, sd = 20)
+library(mice)
 
-# Loop through education and simulate from different normals for different
-# education levels of the population to create dependency 
+source("helper_functions.R")
 
-# set the true values of the beta parameters
-beta <- c(10, .7, .8)
 
-# generate income data using the covariates
-logincome <- beta[1] + beta[2]*age + beta[3]*edu + epsilon
+###############################
+# Run Simulation Combinations #
+###############################
 
-# bind all the covariates and income data into a dataframe
-data <- data.frame(logincome, age, edu) # here I changed it 
-colnames(data) <- c("Logincome", "Age", "Edu")
-
-########################
-# Generate Missingness #
-########################
-# generate missingness on all columns (otherwise specify vector) 
-col.missing <- c(1:ncol(data))
-
-# note that for MAR and MCAR this is a vector of proportions
-prob <- c(.6, .3, .8)
 # coefficients used to generate missingness
 coeff.miss <- c(5, 19, 10)
 
-# Generate MCAR
-data.MCAR <- genMCAR(df = data, vec.prob = prob, vec.col = col.missing)
+# missing probability
+prob <- c(.15, .25, .35, .45)
 
-# Generate MAR
-data.MAR <- genMAR(df = data, prop = prob, beta.missing = coeff.miss, 
-                   vec.col = col.missing)
-
-# Generate MNAR
-data.MNAR <- genMNAR(df = data, prop = prob, beta.missing = coeff.miss, 
-                     vec.col = col.missing)
-
-######################
-# Imputation Methods #
-######################
-
-# METHOD 1: Complete Case analysis
-# Here, we want to remove the rows that have some missing values 
-# using dataframe subsetting
-complete_data_MCAR <- data.MCAR[complete.cases(data.MCAR), ]
-complete_data_MAR <- data.MAR[complete.cases(data.MAR), ]
-complete_data_MNAR <- data.MNAR[complete.cases(data.MNAR),]
-
-# check to see if the data has gotten smaller
-length(data.MCAR$Age)
-length(complete_data_MCAR$Age)
-length(complete_data_MAR$Age)
-length(complete_data_MNAR$Age)
-
-
-# METHOD 2: Single Imputation
-
+# scenarios:
+# MCAR, MAR, MNAR
+# complete, single, multiple
+# prob = .15, .25, .35, .45
+run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, prob[1], 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, prob[2], 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, prob[3], 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, prob[4], 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
 
 
 # METHOD 3: Multiple Imputation
@@ -141,18 +91,10 @@ densityplot(___)
 # This is important as MICE ONLY works if the data is MAR. 
 
 
-##########################
-# Coverage Probabilities #
-##########################
-
-# Method 1: Complete Case Analysis
-
-mcar_fit_m1 <- lm(logincome ~ age + edu, data=complete_data_MCAR)
-mcar_fit_m1_ci <- confint(mcar_fit_m1, "age", level=0.9)
 
 
-
-
+d.i <- mice(data.MAR, method = c("pmm", "pmm", "logreg"))
+library(mice)
 
 
 
