@@ -23,27 +23,48 @@ d <- gen_data()
 m <- genMCAR(d, c(.15,0.15,0.15), c(1,2,3))
 
 ###############################################################################
-logistic<- function(x,y,g1,g2) exp(x*g1+y*g2)/(1+exp(x*g1+y*g2)) 
 
-genMAR <- function(df, beta){
-
-  n <- length(df$logincome)
-
-  logincome.mar<- 1-rbinom(n,1,logistic(df$age,df$edu,beta[2],beta[3]))
-  age.mar <- 1-rbinom(n, 1, logistic(df$logincome, df$edu, beta[1], beta[3]))
-  edu.mar <- 1-rbinom(n, 1, logistic(df$logincome, df$age, beta[1], beta[2]))
+genMAR <- function(df, prop, beta.missing, vec.col){
+  # genMAR takes a dataframe (n by m), a vector (1 by m) of proportions and
+  # a vector (1 by m) indicating in which columns we should induce MAR.
+  # it returns a dataframe containing missing values. For each column selected
+  # on average we will have the respective proportion of missing values.
+  # Assume first column of dataframe is response
   
-  logincome.m <- logincome.mar
-  logincome.m[which(logincome.mar==1)] <-NA
-
-  age.m <- age.mar
-  age.m[which(age.mar==1)] <-NA
+  lCol <- length(vec.col)
   
-  edu.m <- edu.mar
-  edu.m[which(edu.mar==1)] <-NA
+  # We might consider changing this or factoring it out
+  vec.prob <- matrix(NA, ncol = lCol, nrow = nrow(df))
+  vec.beta0 <- rep(NA, lCol)
   
-  df <- cbind(l)
+  for (i in 1:lCol){
+    
+    f <- function (beta0) { 
+      prop[i] - mean(1/(1 + exp(-beta0 - 
+                                  as.matrix(df[,vec.col[-i]])%*%beta.missing[-i])))
+    }
+    
+    vec.beta0[i] <- uniroot(f, interval = c(-100000,100000))$root
+    
+    # I construct the probabilities fitting a logit model
+    # taking out column i makes sure that the missingness is at random.
+    # The way we computed beta0 makes sure that the expected prop. of 
+    # missing values in column i is as desired.
+    vec.prob[,i] <- 1/(1 + exp(-vec.beta0[i] - 
+                                 as.matrix(df[,vec.col[-i]])%*%beta.missing[-i]))   
+  }
   
+  missing.matrix <- matrix(rbinom(n = nrow(df)*lCol, 1, c(vec.prob)), 
+                           ncol = lCol)
+  
+  DfMAR <- df
+  
+  for (i in 1:length(vec.col)) {
+    if (any(which(missing.matrix[,i] == 1))) {
+      DfMAR[which(missing.matrix[,i] == 1), vec.col[i]] <- NA
+    }
+  }
+  return(DfMAR)
 }
 
 #############################################################################
@@ -86,6 +107,7 @@ genMNAR <- function(df, prop, beta.missing, vec.col) {
     DfMNAR[which(missing.matrix[,i] == 1), vec.col[i]] <- NA
   }
   return(DfMNAR) 
+  
 }
 
 
@@ -102,17 +124,17 @@ gen_data <- function() {
   # Generates Census data following this model:
   # logincome = beta_0 + beta_1 * age + beta_2 * education + e_i
   
-  n <- 1000
+  n <- 100
   p.grad <- .25
   edu <- rbinom(n, 1, p.grad)
-  epsilon <- rnorm(n, 0, 1)
+  epsilon <- rnorm(n, 0, 5)
   age <- rep(NA, n)
   
   # Draw from truncated normal
   age[which(edu == 0)] <- rtruncnorm(n - sum(edu), a = 10, b = 105, 
-                                     mean = 50, sd = 30)
+                                     mean = 50, sd = 10)
   age[which(edu == 1)] <- rtruncnorm(sum(edu), a = 10, b = 105, 
-                                     mean = 45, sd = 20)
+                                     mean = 45, sd = 10)
 
   # set the true values of the beta parameters
   beta <- c(10, .7, .8)
@@ -135,7 +157,7 @@ run_simulation <- function(num_iters=1000, missing_method="MCAR",
   # Generates data, missingness, imputations, and computes confidence interval
 
   # set a different, deterministic seed each time a new dataset is generated
-  seed_vec <- 1:1000
+  seed_vec <- 1000:2000
   
   # generate empty vectors to hold the confidence intervals 
   age.ci.res <- rep(NA, num_iters)

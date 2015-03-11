@@ -16,31 +16,43 @@ source("helper_functions.R")
 coeff.miss <- c(1, 1, 1)
 
 # missing probability
-prob <- c(.15, .25, .35, .45)
+prob <- c(.05, .15, .25)
 
 # scenarios:
 # MCAR, MAR, MNAR
 # complete, single, multiple
-# prob = .15, .25, .35, .45
+# prob = .15, .35, .65
 run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, prob[1], 
                impute_method="complete", level=.9, true_betas=c(10, .7, .8))
 run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, prob[2], 
                impute_method="complete", level=.9, true_betas=c(10, .7, .8))
 run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, prob[3], 
                impute_method="complete", level=.9, true_betas=c(10, .7, .8))
-run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, prob[4], 
-               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+
 
 run_simulation(num_iters=1000, missing_method="MAR", coeff.miss=coeff.miss, prob[1], 
                impute_method="complete", level=.9, true_betas=c(10, .7, .8))
-run_simulation(num_iters=1000, missing_method="MAR", coeff.miss=coeff.miss, prob[4], 
+run_simulation(num_iters=1000, missing_method="MAR", coeff.miss=coeff.miss, prob[2], 
                impute_method="complete", level=.9, true_betas=c(10, .7, .8))
-run_simulation(num_iters=1000, missing_method="MAR", coeff.miss=coeff.miss, .85, 
+run_simulation(num_iters=1000, missing_method="MAR", coeff.miss=coeff.miss, prob[3], 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+
+run_simulation(num_iters=1000, missing_method="MNAR", coeff.miss=coeff.miss, prob[1], 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+run_simulation(num_iters=1000, missing_method="MNAR", coeff.miss=coeff.miss, prob[2], 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+run_simulation(num_iters=1000, missing_method="MNAR", coeff.miss=coeff.miss, prob[3], 
                impute_method="complete", level=.9, true_betas=c(10, .7, .8))
 
 
-run_simulation(num_iters=1000, missing_method="MNAR", coeff.miss=coeff.miss, .95, 
-               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+dat <- gen_data()
+d.w.m <- genMNAR(df = dat, prop = c(.75, .75, .75), beta.missing = c(1, 1, 1), 
+                 vec.col = c(1, 2, 3))
+d.f <- d.w.m[complete.cases(d.w.m), ]
+#15
+fit <- lm(logincome ~ age + edu, data = d.f)
+confint(fit, "age")
+confint(fit, "edu") # just stops working at a point
 
 
 # METHOD 3: Multiple Imputation
