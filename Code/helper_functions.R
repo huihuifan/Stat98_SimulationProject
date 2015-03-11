@@ -121,3 +121,104 @@ genMNAR <- function(df, prop, beta.missing, vec.col) {
   }
   return(DfMNAR)
 }
+
+
+###################################
+# Generate Coverage Probabilities #
+###################################
+
+in.interval <- function(x, lo, hi) {
+  abs(x-(hi+lo)/2) > (hi-lo)/2 
+}
+
+seed_vec <- 1:1000
+
+gen_data <-
+  
+cal_cis <- function(missing_method="MCAR") {
+  n <- 1000
+  p.grad <- .25
+  
+  edu <- rbinom(n, 1, p.grad)
+  epsilon <- rnorm(n, 0, 1)
+  age <- rep(NA, n)
+  
+  # We use the faact that the number of units with edu == 1 is sum(edu)
+  # because edu is binary. Also, we draw from a truncated normal 
+  # with range (0,105). 
+  library(truncnorm)
+  age[which(edu == 0)] <- rtruncnorm(n - sum(edu), a = 10, b = 105, 
+                                     mean = 50, sd = 30)
+  age[which(edu == 1)] <- rtruncnorm(sum(edu), a = 10, b = 105, 
+                                     mean = 45, sd = 20)
+  
+  # Loop through education and simulate from different normals for different
+  # education levels of the population to create dependency 
+  
+  # set the true values of the beta parameters
+  beta <- c(10, .7, .8)
+  
+  # generate income data using the covariates
+  logincome <- beta[1] + beta[2]*age + beta[3]*edu + epsilon
+  
+  # bind all the covariates and income data into a dataframe
+  data <- data.frame(logincome, age, edu) # here I changed it 
+  colnames(data) <- c("Logincome", "Age", "Edu")
+  
+}
+
+coverage_probs <- function(data, missing_method="MCAR", col.missing, 
+                           coeff.miss="none", prob, impute_method="complete", 
+                           level=.9, iters=1000, true_betas=c(10, .7, .8)) {
+  
+  # given the missingness method, generate the missing data
+  if (missing_method == "MCAR") {
+    # d.w.m means "data with missingness"
+    d.w.m <- genMCAR(df = data, vec.prob = prob, vec.col = col.missing)
+  }
+  else if (missing_method == "MAR") {
+    d.w.m <- genMAR(df = data, prop = prob, beta.missing = coeff.miss, 
+                                 vec.col = col.missing)
+  }
+  else {
+    d.w.m <- genMNAR(df = data, prop = prob, beta.missing = coeff.miss, 
+                   vec.col = col.missing)
+  }
+  
+  # given the imputation method, generate the dataset for analysis
+  if (impute_method == "complete") {
+    # d.f means "data filled"
+    d.f <- d.w.m[complete.cases(d.w.m), ]
+  }
+  else if (impute_method == "single") {
+    
+  }
+  else if (impute_method == "multiple") {
+    
+  }
+    
+  fit <- lm(logincome ~ age + edu, data=d.f)
+  fit.ci.age <- confint(fit, "age", level=level)
+  fit.ci.edu <- confint(fit, "edu", level=level)
+  
+  age_in <- in.interval(true_betas[1], fit.ci.age[1], fit.ci.age[2])
+  edu_in <- in.interval(true_betas[2], fit.ci.edu[1], fit.ci.edu[2])
+  
+  return(c(age_in, edu_in))
+
+}
+
+lapply(age_results, in.interval(true_betas[1], fit.ci.age[1], fit.ci.age[2]))
+
+
+
+
+
+
+
+
+
+
+
+
+

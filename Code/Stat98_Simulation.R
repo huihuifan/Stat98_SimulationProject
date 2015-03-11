@@ -1,11 +1,14 @@
 ###################
 # Data Generation #
 ###################
-source("./helper_functions.R")
+
+# setwd("/Users/AngelaFan/Desktop/Stat98_SimulationProject/Code")
+source("helper_functions.R")
+set.seed(02138)
 
 #Maybe we can create a helper functions to generate obs?
 
-# n = sample size, p = probability of having at least grad level education
+# n = sample size, p.grad = probability of having at least grad level education
 n <- 1000
 p.grad <- .25
 
@@ -15,7 +18,7 @@ age <- rep(NA, n)
 
 # We use the faact that the number of units with edu == 1 is sum(edu)
 # because edu is binary. Also, we draw from a truncated normal 
-# with range (0,105). Is this an issue?
+# with range (0,105). 
 library(truncnorm)
 age[which(edu == 0)] <- rtruncnorm(n - sum(edu), a = 10, b = 105, 
                                    mean = 50, sd = 30)
@@ -24,15 +27,6 @@ age[which(edu == 1)] <- rtruncnorm(sum(edu), a = 10, b = 105,
 
 # Loop through education and simulate from different normals for different
 # education levels of the population to create dependency 
-
-# for (i in 1:n) {
-#   if (edu[i] == 0) {
-#     age[i] <- rnorm(1, 50, 30)
-#   }
-#   else {
-#     age[i] <- rnorm(1, 45, 20)    
-#   }
-# }
 
 # set the true values of the beta parameters
 beta <- c(10, .7, .8)
@@ -77,17 +71,17 @@ complete_data_MCAR <- data.MCAR[complete.cases(data.MCAR), ]
 complete_data_MAR <- data.MAR[complete.cases(data.MAR), ]
 complete_data_MNAR <- data.MNAR[complete.cases(data.MNAR),]
 
+# check to see if the data has gotten smaller
+length(data.MCAR$Age)
+length(complete_data_MCAR$Age)
+length(complete_data_MAR$Age)
+length(complete_data_MNAR$Age)
+
 
 # METHOD 2: Single Imputation
-vec_mean.MCAR <- rep(NA, ncol(data.MCAR))
-vec.mean.MAR <- rep(NA, ncol(data.MAR))
-vec.mean.MNAR <- rep(NA, ncol(data.MNAR))
 
-for (i in 1:ncol(data)) {
-  vec.mean.MCAR[i] <- mean(data.MCAR)
-  vec.mean.MAR[i] <- mean(data.MAR)
-  vec.mean.MNAR[i] <- mean(data.MNAR)
-}
+
+
 # METHOD 3: Multiple Imputation
 library("mice")
 library("mi")
@@ -151,26 +145,19 @@ densityplot(___)
 # Coverage Probabilities #
 ##########################
 
-in.interval <- function(x, lo, hi) {
-  abs(x-(hi+lo)/2) < (hi-lo)/2 
-}
+# Method 1: Complete Case Analysis
 
-calc_covg_prob <- function(n, p, n_iters) {
-  results <- rep(NA, n_iters)
-  for (i in 1:n_iters) {
-    binoms <- rbinom(n,1,p)
-    mu <- mean(binoms)
-    vari <- var(binoms)
-    low <- mu - 1.96*vari*(1/sqrt(n)) 
-    high <- mu + 1.96*vari*(1/sqrt(n))
-    
-    results[i] <- in.interval(p, low, high)
-  }
-  return(sum(results)/n_iters)
-}
+mcar_fit_m1 <- lm(logincome ~ age + edu, data=complete_data_MCAR)
+mcar_fit_m1_ci <- confint(mcar_fit_m1, "age", level=0.9)
 
-for (i in 1:length(n)) {
-  for (j in 1:length(p)) {
-    print(calc_covg_prob(n[i], p[j], 10000))
-  }
-}
+
+
+
+
+
+
+
+
+
+
+
