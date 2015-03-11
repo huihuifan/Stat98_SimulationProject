@@ -211,6 +211,27 @@ coverage_probs <- function(data, missing_method="MCAR",
     
   }
   else if (impute_method == "multiple") {
+    
+    dat <- gen_data()
+    missing_dat <- genMAR(dat, prop=c(.25, .25, .25), vec.col=c(1, 2, 3), beta.missing=coeff.miss)
+    
+    missing_dat$edu <- as.factor(missing_dat$edu)
+    ini<-mice(missing_dat,maxit=0)
+    pred<-quickpred(missing_dat)
+    vis<- order(ini$nmis)[1:3]
+    mth<-ini$method # mice knows they are factors
+    
+    imp <- mice(missing_dat, m=5, method = mth, predictorMatrix = pred,
+                visitSequence = vis, maxit = 5)  
+    
+    fit <- with(imp, lm(logincome ~ age + edu)) 
+    est <- pool(fit) # pools the values with rubin's combining rules
+    
+    val <- data.frame(summary(pool(fit)))    
+    ci.age <- c(val$est[2] - 1.96*val$se[2], val$est[2] + 1.96*val$se[2])
+    ci.edu <- c(val$est[3] - 1.96*val$se[3], val$est[3] + 1.96*val$se[3])
+    
+    
   }
     
   fit <- lm(logincome ~ age + edu, data=d.f)
