@@ -128,6 +128,8 @@ genMNAR <- function(df, prop, beta.missing, vec.col) {
 ###################################
 
 in.interval <- function(x, lo, hi) {
+  # Tests if a value is inside an interval
+  
   abs(x-(hi+lo)/2) > (hi-lo)/2 
 }
 
