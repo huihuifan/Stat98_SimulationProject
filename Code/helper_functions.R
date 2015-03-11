@@ -19,8 +19,6 @@ genMCAR <- function(df, vec.prob, vec.col) {
   
   return(DfMCAR)
 }
-d <- gen_data()
-m <- genMCAR(d, c(.15,0.15,0.15), c(1,2,3))
 
 ###############################################################################
 
@@ -55,7 +53,7 @@ genMAR <- function(df, prop, beta.missing, vec.col){
   }
   
   missing.matrix <- matrix(rbinom(n = nrow(df)*lCol, 1, c(vec.prob)), 
-                           ncol = lCol)
+                           ncol = lCol, byrow=T)
   
   DfMAR <- df
   
@@ -94,10 +92,10 @@ genMNAR <- function(df, prop, beta.missing, vec.col) {
   }
   
   missing.matrix <- matrix(rbinom(n = nrow(df)*lCol, 1, c(vec.prob)), 
-                           ncol = lCol)
+                           ncol = lCol, byrow=T)
   
-  missing <- rbinom(length(dat$logincome), 1, .4)
-  missing[which(dat$age < 40 | dat$logincome < 50)] <- 0
+  missing <- rbinom(length(df$logincome), 1, .4)
+  missing[which(df$age < 40 | df$logincome < 50)] <- 0
   
   missing.matrix[, 1] <- missing
   
@@ -124,7 +122,7 @@ gen_data <- function() {
   # Generates Census data following this model:
   # logincome = beta_0 + beta_1 * age + beta_2 * education + e_i
   
-  n <- 100
+  n <- 1000
   p.grad <- .25
   edu <- rbinom(n, 1, p.grad)
   epsilon <- rnorm(n, 0, 5)
@@ -179,8 +177,8 @@ run_simulation <- function(num_iters=1000, missing_method="MCAR",
   
 }
 
-coverage_probs <- function(data, missing_method="MCAR",
-                           coeff.miss="none", prob, impute_method="complete", 
+coverage_probs <- function(data, missing_method,
+                           coeff.miss="none", prob, impute_method, 
                            level=.9, iters=1000, true_betas=c(10, .7, .8)) {
  
   # Returns True/False for if the confidence interval for beta for 
@@ -208,9 +206,12 @@ coverage_probs <- function(data, missing_method="MCAR",
     d.f <- d.w.m[complete.cases(d.w.m), ]
   }
   else if (impute_method == "single") {
-    
+    d.w.m$edu <- as.factor(d.w.m$edu)
+    imp <- mice(d.w.m, m=1, meth=c("pmm", "pmm", "logreg"), maxit=0)
+    d.f <- complete(imp, 1)
   }
   else if (impute_method == "multiple") {
+<<<<<<< HEAD
     
     dat <- gen_data()
     missing_dat <- genMAR(dat, prop=c(.25, .25, .25), vec.col=c(1, 2, 3), beta.missing=coeff.miss)
@@ -233,21 +234,37 @@ coverage_probs <- function(data, missing_method="MCAR",
     
     
   }
+=======
+>>>>>>> 2da9d10478ad6e88a93e62bed15430880ebe29d6
     
+    d.w.m$edu <- as.factor(d.w.m$edu)
+    ini <- mice(d.w.m, maxit=0)
+    pred <- quickpred(d.w.m)
+    vis <- order(ini$nmis)[1:3]
+    meth <- ini$meth
+    imp <- mice(d.w.m, meth=meth, predictorMatrix=pred, visitSequence=vis, 
+                maxit=5)
+    fit <- with(imp, lm(logincome ~ age + edu))
+    est <- pool(fit)
+    val <- data.frame(summary(est))
+    fit.ci.age <- c(val$est[2] - qnorm(1-(1-level)/2)*val$se[2], 
+            val$est[2] + qnorm(1-(1-level)/2)*val$se[2])
+    fit.ci.edu <- c(val$est[3] - qnorm(1-(1-level)/2)*val$se[3], 
+                val$est[3] + qnorm(1-(1-level)/2)*val$se[3])
+    
+  }  
+  
+  if (impute_method != "multiple") {
   fit <- lm(logincome ~ age + edu, data=d.f)
   fit.ci.age <- confint(fit, "age", level=level)
   fit.ci.edu <- confint(fit, "edu", level=level)
+  }
   
   age_in <- in.interval(true_betas[2], fit.ci.age[1], fit.ci.age[2])
   edu_in <- in.interval(true_betas[3], fit.ci.edu[1], fit.ci.edu[2])
   
   return(c(age_in, edu_in))
-
 }
-
-
-
-
 
 
 
