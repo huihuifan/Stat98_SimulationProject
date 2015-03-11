@@ -165,7 +165,7 @@ run_simulation <- function(num_iters=1000, missing_method="MCAR",
     set.seed(seed_vec[i])
     dat <- gen_data()
     # compute confidence intervals
-    res <- coverage_probs(iters=1000, data=dat, missing_method=missing_method, coeff.miss=coeff.miss,
+    res <- coverage_probs(iters=num_iters, data=dat, missing_method=missing_method, coeff.miss=coeff.miss,
                                     prob=c(prob, prob, prob), impute_method=impute_method, level=level,
                                     true_betas=true_betas)
     age.ci.res[i] <- res[1]
@@ -206,36 +206,29 @@ coverage_probs <- function(data, missing_method,
     d.f <- d.w.m[complete.cases(d.w.m), ]
   }
   else if (impute_method == "single") {
+   
+    #dat <- gen_data()
+    #d.w.m <- genMAR(dat, prop=c(.15, .15, .15), c(3, 3, 3), c(1, 2, 3))
+    
     d.w.m$edu <- as.factor(d.w.m$edu)
-    imp <- mice(d.w.m, m=1, meth=c("pmm", "pmm", "logreg"), maxit=0)
-    d.f <- complete(imp, 1)
+    ini <- mice(d.w.m, maxit=0)
+    pred <- quickpred(d.w.m)
+    vis <- order(ini$nmis)[1:3]
+    meth <- ini$meth
+    imp <- mice(d.w.m, m=1, meth=meth, predictorMatrix=pred, visitSequence=vis, 
+                maxit=5)
+    d.f <- complete(imp,1)
+    fit <- lm(logincome ~ age + edu, data=d.f)
+    val <- data.frame(summary(fit)$coefficients)
+    fit.ci.age <- c(val$Estimate[2] - qnorm(1-(1-level)/2)*val$Std..Error[2], 
+                    val$Estimate[2] + qnorm(1-(1-level)/2)*val$Std..Error[2])
+    fit.ci.edu <- c(val$Estimate[3] - qnorm(1-(1-level)/2)*val$Std..Error[3], 
+                    val$Estimate[3] + qnorm(1-(1-level)/2)*val$Std..Error[3])
   }
   else if (impute_method == "multiple") {
-<<<<<<< HEAD
     
-    dat <- gen_data()
-    missing_dat <- genMAR(dat, prop=c(.25, .25, .25), vec.col=c(1, 2, 3), beta.missing=coeff.miss)
-    
-    missing_dat$edu <- as.factor(missing_dat$edu)
-    ini<-mice(missing_dat,maxit=0)
-    pred<-quickpred(missing_dat)
-    vis<- order(ini$nmis)[1:3]
-    mth<-ini$method # mice knows they are factors
-    
-    imp <- mice(missing_dat, m=5, method = mth, predictorMatrix = pred,
-                visitSequence = vis, maxit = 5)  
-    
-    fit <- with(imp, lm(logincome ~ age + edu)) 
-    est <- pool(fit) # pools the values with rubin's combining rules
-    
-    val <- data.frame(summary(pool(fit)))    
-    ci.age <- c(val$est[2] - 1.96*val$se[2], val$est[2] + 1.96*val$se[2])
-    ci.edu <- c(val$est[3] - 1.96*val$se[3], val$est[3] + 1.96*val$se[3])
-    
-    
-  }
-=======
->>>>>>> 2da9d10478ad6e88a93e62bed15430880ebe29d6
+    #dat <- gen_data()
+    #d.w.m <- genMAR(dat, prop=c(.15, .15, .15), c(3, 3, 3), c(1, 2, 3))
     
     d.w.m$edu <- as.factor(d.w.m$edu)
     ini <- mice(d.w.m, maxit=0)
@@ -244,6 +237,7 @@ coverage_probs <- function(data, missing_method,
     meth <- ini$meth
     imp <- mice(d.w.m, meth=meth, predictorMatrix=pred, visitSequence=vis, 
                 maxit=5)
+    #bwplot(imp)
     fit <- with(imp, lm(logincome ~ age + edu))
     est <- pool(fit)
     val <- data.frame(summary(est))
@@ -254,10 +248,10 @@ coverage_probs <- function(data, missing_method,
     
   }  
   
-  if (impute_method != "multiple") {
-  fit <- lm(logincome ~ age + edu, data=d.f)
-  fit.ci.age <- confint(fit, "age", level=level)
-  fit.ci.edu <- confint(fit, "edu", level=level)
+  if (impute_method == "complete") {
+    fit <- lm(logincome ~ age + edu, data=d.f)
+    fit.ci.age <- confint(fit, "age", level=level)
+    fit.ci.edu <- confint(fit, "edu", level=level)
   }
   
   age_in <- in.interval(true_betas[2], fit.ci.age[1], fit.ci.age[2])
