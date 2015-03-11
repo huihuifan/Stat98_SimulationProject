@@ -131,30 +131,22 @@ in.interval <- function(x, lo, hi) {
   abs(x-(hi+lo)/2) > (hi-lo)/2 
 }
 
-seed_vec <- 1:1000
-
-gen_data <-
+gen_data <- function() {
   
-cal_cis <- function(missing_method="MCAR") {
   n <- 1000
   p.grad <- .25
-  
   edu <- rbinom(n, 1, p.grad)
   epsilon <- rnorm(n, 0, 1)
   age <- rep(NA, n)
   
-  # We use the faact that the number of units with edu == 1 is sum(edu)
+  # We use the fact that the number of units with edu == 1 is sum(edu)
   # because edu is binary. Also, we draw from a truncated normal 
   # with range (0,105). 
-  library(truncnorm)
   age[which(edu == 0)] <- rtruncnorm(n - sum(edu), a = 10, b = 105, 
                                      mean = 50, sd = 30)
   age[which(edu == 1)] <- rtruncnorm(sum(edu), a = 10, b = 105, 
                                      mean = 45, sd = 20)
-  
-  # Loop through education and simulate from different normals for different
-  # education levels of the population to create dependency 
-  
+
   # set the true values of the beta parameters
   beta <- c(10, .7, .8)
   
@@ -162,8 +154,23 @@ cal_cis <- function(missing_method="MCAR") {
   logincome <- beta[1] + beta[2]*age + beta[3]*edu + epsilon
   
   # bind all the covariates and income data into a dataframe
-  data <- data.frame(logincome, age, edu) # here I changed it 
+  data <- data.frame(logincome, age, edu) 
   colnames(data) <- c("Logincome", "Age", "Edu")
+  
+  return(data)
+  
+}
+
+seed_vec <- 1:1000
+library(truncnorm)
+
+run_simulation <- function(num_iters) {
+  
+  age.ci.res <- rep(NA, num_iters)
+  
+  
+  lapply(age_results, in.interval(true_betas[1], fit.ci.age[1], fit.ci.age[2]))
+  
   
 }
 
@@ -208,7 +215,6 @@ coverage_probs <- function(data, missing_method="MCAR", col.missing,
 
 }
 
-lapply(age_results, in.interval(true_betas[1], fit.ci.age[1], fit.ci.age[2]))
 
 
 
