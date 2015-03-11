@@ -13,7 +13,7 @@ source("helper_functions.R")
 ###############################
 
 # coefficients used to generate missingness
-coeff.miss <- c(5, 19, 10)
+coeff.miss <- c(1, 1, 1)
 
 # missing probability
 prob <- c(.15, .25, .35, .45)
@@ -30,6 +30,16 @@ run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, pro
                impute_method="complete", level=.9, true_betas=c(10, .7, .8))
 run_simulation(num_iters=1000, missing_method="MCAR", coeff.miss=coeff.miss, prob[4], 
                impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+
+
+run_simulation(num_iters=1000, missing_method="MAR", coeff.miss=coeff.miss, prob[1], 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+run_simulation(num_iters=1000, missing_method="MAR", coeff.miss=coeff.miss, prob[4], 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+
+run_simulation(num_iters=1000, missing_method="MAR", coeff.miss=coeff.miss, .85, 
+               impute_method="complete", level=.9, true_betas=c(10, .7, .8))
+
 
 
 # METHOD 3: Multiple Imputation

@@ -1,25 +1,7 @@
-###############################################################################
-# TOMORROW I WILL TRY TO OPTIMIZE MY CODE, FOR INSTANCE, I CAN FACTOR OUT
-# A LOT OF STUFF, BUT FOR NOW THIS SHOUDL WORK OR AT LEAST I HOPE SO!!
-###############################################################################
-
 # gen.MCAR takes a dataframe n by m, a vector of probabilities (default: 0.5),
 # a vector of integers that specifies for which columns we would like to generate
 # missing data (default: all columns).
 genMCAR <- function(df, vec.prob, vec.col) {
-  
-  if (missing(vec.col) && !missing(vec.prob)) {
-    stop("Specify columns in data frame where to induce MCAR")
-  }
-  
-  else if (missing(vec.col) && missing(vec.prob)) {
-    vec.col <- c(1:ncol(df))
-    vec.prob <- rep(0.5, length(vec.col))
-  }
-  
-  else if (missing(vec.prob) && !missing(vec.col)){
-    vec.prob <- rep(0.5, length(vec.col))
-  }
   
   NumRowDf <- nrow(df)
   NumColDf <- ncol(df)
@@ -37,6 +19,8 @@ genMCAR <- function(df, vec.prob, vec.col) {
   
   return(DfMCAR)
 }
+d <- gen_data()
+m <- genMCAR(d, c(.15,0.15,0.15), c(1,2,3))
 
 ###############################################################################
 genMAR <- function(df, prop, beta.missing, vec.col){
@@ -129,8 +113,7 @@ genMNAR <- function(df, prop, beta.missing, vec.col) {
 
 in.interval <- function(x, lo, hi) {
   # Tests if a value is inside an interval
-  
-  abs(x-(hi+lo)/2) > (hi-lo)/2 
+  abs(x-(hi+lo)/2) < (hi-lo)/2 
 }
 
 gen_data <- function() {
@@ -180,9 +163,8 @@ run_simulation <- function(num_iters=1000, missing_method="MCAR",
     set.seed(seed_vec[i])
     dat <- gen_data()
     # compute confidence intervals
-    probs <- rep(prob, 3)
     res <- coverage_probs(iters=1000, data=dat, missing_method=missing_method, coeff.miss=coeff.miss,
-                                    prob=probs, impute_method=impute_method, level=level,
+                                    prob=c(prob, prob, prob), impute_method=impute_method, level=level,
                                     true_betas=true_betas)
     age.ci.res[i] <- res[1]
     edu.ci.res[i] <- res[2]
@@ -225,15 +207,14 @@ coverage_probs <- function(data, missing_method="MCAR",
     
   }
   else if (impute_method == "multiple") {
-    d.i <- mice(d.w.m, method = "")
   }
     
   fit <- lm(logincome ~ age + edu, data=d.f)
   fit.ci.age <- confint(fit, "age", level=level)
   fit.ci.edu <- confint(fit, "edu", level=level)
   
-  age_in <- in.interval(true_betas[1], fit.ci.age[1], fit.ci.age[2])
-  edu_in <- in.interval(true_betas[2], fit.ci.edu[1], fit.ci.edu[2])
+  age_in <- in.interval(true_betas[2], fit.ci.age[1], fit.ci.age[2])
+  edu_in <- in.interval(true_betas[3], fit.ci.edu[1], fit.ci.edu[2])
   
   return(c(age_in, edu_in))
 
