@@ -1,3 +1,36 @@
+#################
+# Generate Data #
+#################
+
+gen_data <- function(n=1000, beta=c(10, .7, .8)) {
+  # Generates Census data following this model:
+  # logincome = beta_0 + beta_1 * age + beta_2 * education + e_i
+  
+  p.grad <- .25
+  edu <- rbinom(n, 1, p.grad)
+  epsilon <- rnorm(n, 0, 5)
+  age <- rep(NA, n)
+  
+  # Draw from truncated normal
+  age[which(edu == 0)] <- rtruncnorm(n - sum(edu), a = 10, b = 105, 
+                                     mean = 50, sd = 10)
+  age[which(edu == 1)] <- rtruncnorm(sum(edu), a = 10, b = 105, 
+                                     mean = 45, sd = 10)
+  
+  # generate income data using the covariates
+  logincome <- beta[1] + beta[2]*age + beta[3]*edu + epsilon
+  
+  # bind all the covariates and income data into a dataframe
+  data <- data.frame(logincome, age, edu) 
+  colnames(data) <- c("logincome", "age", "edu")
+  
+  return(data)
+}
+
+########################
+# Generate Missingness #
+########################
+
 # gen.MCAR takes a dataframe n by m, a vector of probabilities (default: 0.5),
 # a vector of integers that specifies for which columns we would like to generate
 # missing data (default: all columns).
@@ -109,76 +142,17 @@ genMNAR <- function(df, prop, beta.missing, vec.col) {
 }
 
 
-###################################
-# Generate Coverage Probabilities #
-###################################
+#####################################
+# Run Simulation for Coverage Probs #
+#####################################
 
 in.interval <- function(x, lo, hi) {
   # Tests if a value is inside an interval
   abs(x-(hi+lo)/2) < (hi-lo)/2 
 }
 
-gen_data <- function() {
-  # Generates Census data following this model:
-  # logincome = beta_0 + beta_1 * age + beta_2 * education + e_i
-  
-  n <- 1000
-  p.grad <- .25
-  edu <- rbinom(n, 1, p.grad)
-  epsilon <- rnorm(n, 0, 5)
-  age <- rep(NA, n)
-  
-  # Draw from truncated normal
-  age[which(edu == 0)] <- rtruncnorm(n - sum(edu), a = 10, b = 105, 
-                                     mean = 50, sd = 10)
-  age[which(edu == 1)] <- rtruncnorm(sum(edu), a = 10, b = 105, 
-                                     mean = 45, sd = 10)
-
-  # set the true values of the beta parameters
-  beta <- c(10, .7, .8)
-  
-  # generate income data using the covariates
-  logincome <- beta[1] + beta[2]*age + beta[3]*edu + epsilon
-  
-  # bind all the covariates and income data into a dataframe
-  data <- data.frame(logincome, age, edu) 
-  colnames(data) <- c("logincome", "age", "edu")
-  
-  return(data)
-}
-
-run_simulation <- function(num_iters=1000, missing_method="MCAR", 
+coverage_probs <- function(data, missing_method="MCAR",
                            coeff.miss="none", prob, impute_method="complete", 
-                           level=.9, true_betas=c(10, .7, .8)) {
-  
-  # Calculates coverage probability for given number of iterations
-  # Generates data, missingness, imputations, and computes confidence interval
-
-  # set a different, deterministic seed each time a new dataset is generated
-  seed_vec <- 1000:2000
-  
-  # generate empty vectors to hold the confidence intervals 
-  age.ci.res <- rep(NA, num_iters)
-  edu.ci.res <- rep(NA, num_iters)
-  
-  for (i in 1:num_iters) {
-    set.seed(seed_vec[i])
-    dat <- gen_data()
-    # compute confidence intervals
-    res <- coverage_probs(iters=num_iters, data=dat, missing_method=missing_method, coeff.miss=coeff.miss,
-                                    prob=c(prob, prob, prob), impute_method=impute_method, level=level,
-                                    true_betas=true_betas)
-    age.ci.res[i] <- res[1]
-    edu.ci.res[i] <- res[2]
-  }
-  
-  # compute coverage probability 
-  return(c(sum(age.ci.res)/num_iters, sum(edu.ci.res)/num_iters)) 
-  
-}
-
-coverage_probs <- function(data, missing_method,
-                           coeff.miss="none", prob, impute_method, 
                            level=.9, iters=1000, true_betas=c(10, .7, .8)) {
  
   # Returns True/False for if the confidence interval for beta for 
@@ -204,6 +178,9 @@ coverage_probs <- function(data, missing_method,
   if (impute_method == "complete") {
     # d.f means "data filled"
     d.f <- d.w.m[complete.cases(d.w.m), ]
+    fit <- lm(logincome ~ age + edu, data=d.f)
+    fit.ci.age <- confint(fit, "age", level=level)
+    fit.ci.edu <- confint(fit, "edu", level=level)
   }
   else if (impute_method == "single") {
    
@@ -245,14 +222,7 @@ coverage_probs <- function(data, missing_method,
             val$est[2] + qnorm(1-(1-level)/2)*val$se[2])
     fit.ci.edu <- c(val$est[3] - qnorm(1-(1-level)/2)*val$se[3], 
                 val$est[3] + qnorm(1-(1-level)/2)*val$se[3])
-    
   }  
-  
-  if (impute_method == "complete") {
-    fit <- lm(logincome ~ age + edu, data=d.f)
-    fit.ci.age <- confint(fit, "age", level=level)
-    fit.ci.edu <- confint(fit, "edu", level=level)
-  }
   
   age_in <- in.interval(true_betas[2], fit.ci.age[1], fit.ci.age[2])
   edu_in <- in.interval(true_betas[3], fit.ci.edu[1], fit.ci.edu[2])
@@ -261,11 +231,32 @@ coverage_probs <- function(data, missing_method,
 }
 
 
-
-
-
-
-
-
-
+run_simulation <- function(num_iters=1000, missing_method="MCAR", 
+                           coeff.miss="none", prob, impute_method="complete", 
+                           level=.9, true_betas=c(10, .7, .8), n=1000) {
+  
+  # Calculates coverage probability for given number of iterations
+  # Generates data, missingness, imputations, and computes confidence interval
+  
+  # set a different, deterministic seed each time a new dataset is generated
+  seed_vec <- 1:2000
+  
+  # generate empty vectors to hold the confidence intervals 
+  age.ci.res <- rep(NA, num_iters)
+  edu.ci.res <- rep(NA, num_iters)
+  
+  for (i in 1:num_iters) {
+    set.seed(seed_vec[i])
+    dat <- gen_data(n, true_betas)
+    # compute confidence intervals
+    res <- coverage_probs(iters=num_iters, data=dat, missing_method=missing_method, coeff.miss=coeff.miss,
+                          prob=c(prob, prob, prob), impute_method=impute_method, level=level,
+                          true_betas=true_betas)
+    age.ci.res[i] <- res[1]
+    edu.ci.res[i] <- res[2]
+  }
+  
+  # compute coverage probability 
+  return(c(sum(age.ci.res)/num_iters, sum(edu.ci.res)/num_iters))  
+}
 
